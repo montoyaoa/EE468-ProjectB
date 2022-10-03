@@ -195,7 +195,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, const char *file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -221,8 +221,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  /* Open executable file. */
-  file = filesys_open (file_name);
+  //create a copy of the command input (in file_name)
+  char* cmd_input = palloc_get_page(0);
+  strlcat(cmd_input, file_name, strlen(file_name) + 1);
+  //a save pointer used for strtok_r (we don't use it, but it is required)
+  const char* save_ptr;
+  
+  /* Open executable file. Use strtok_r to extract only the first word
+     as the filename of the program. */
+  file = filesys_open (strtok_r(file_name, " " , &save_ptr));
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -301,8 +308,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
         }
     }
 
-  /* Set up stack. */
-  if (!setup_stack (esp))
+  /* Set up stack. Pass along the command input for parsing. */
+  if (!setup_stack (esp, cmd_input))
     goto done;
 
   /* Start address. */
@@ -425,19 +432,22 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
-   user virtual memory. */
+   user virtual memory. Added argument: command input. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, const char *cmd_input) 
 {
   uint8_t *kpage;
   bool success = false;
+  
+  //TODO: Parse cmd_input to set up stack correctly.
+  printf("cmd_input in setup_stack()=%s\n", cmd_input);
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
-        *esp = PHYS_BASE;
+        *esp = PHYS_BASE - 12;
       else
         palloc_free_page (kpage);
     }
