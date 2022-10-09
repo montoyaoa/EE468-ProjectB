@@ -195,7 +195,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp, const char *file_name);
+static bool setup_stack (void **esp, const char *cmd_input, int num_args);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -214,6 +214,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  int num_args = 0;
+  char *token;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -230,6 +232,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Open executable file. Use strtok_r to extract only the first word
      as the filename of the program. */
   file = filesys_open (strtok_r(file_name, " " , &save_ptr));
+
+  //iterate through the rest of the arguments in the command input (useful for setup_stack())
+  for(token = strtok_r (NULL, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
+  	num_args++;
+}
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -309,7 +316,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. Pass along the command input for parsing. */
-  if (!setup_stack (esp, cmd_input))
+  if (!setup_stack (esp, cmd_input, num_args))
     goto done;
 
   /* Start address. */
@@ -434,20 +441,81 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. Added argument: command input. */
 static bool
-setup_stack (void **esp, const char *cmd_input) 
+setup_stack (void **esp, const char *cmd_input, int num_args) 
 {
   uint8_t *kpage;
   bool success = false;
+  char *token, *save_ptr;
+  int argc, word_align;
+  char **argv;
+  int i = 0;
   
-  //TODO: Parse cmd_input to set up stack correctly.
-  printf("cmd_input in setup_stack()=%s\n", cmd_input);
-
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE - 12;
+	if (success){
+		//initialize the stack pointer to PHYS_BASE.
+		//by default, it is zero.
+		*esp = PHYS_BASE;
+		//the total number of command inputs is the number of arguments, 
+		//plus one for the filename of the program,
+		//plus one final terminating NULL.
+        	argc = num_args + 2;
+		//initialize an array of pointers, each pointing to the location
+		//in the stack of each argument
+	 	argv = (char **)malloc(argc);
+		
+		//iterate over the entire command input
+		for(token = strtok_r(cmd_input, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
+        		//store the current word on the stack
+			*esp = *esp - (strlen(token) + 1);
+			*esp = memcpy(*esp, token, strlen(token) + 1);
+  			hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
+			//store the memory location in the stack as the ith argv
+			argv[i] = *esp;
+			i++;
+		}
+		//the last "argument" pointer should be a NULL pointer
+		argv[num_args + 1] = 0;
+		
+		//calculate the number of bytes needed to align the stack pointer
+		//by 4 bytes.
+		word_align = (size_t)*esp % 4;	
+		if(word_align){
+			//align the stack pointer if necessary
+			*esp -= word_align;
+			memset(*esp, 0, word_align);
+  			hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
+		}      
+
+		//starting from the last argument pointer and iterating backwards
+		for(i = num_args + 1; i >= 0; i--){
+			//store the stack location of each argument on the stack
+        		*esp = *esp - sizeof(char *);
+			*esp = memcpy(*esp, &argv[i], sizeof(char *));
+  			hex_dump(*esp, *esp, PHYS_BASE - *esp, true);	
+		}
+
+		//store the location of the stack pointer after finishing the loop.
+		//this is the memory location of argv[0] 
+		void *temp = *esp;
+        
+		//store this temporary stack pointer location on the stack
+		*esp = *esp - sizeof(char **);
+		*esp = memcpy(*esp, &temp, sizeof(char **));
+  		hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
+
+		//store the number of arguments, argc.
+        	*esp = *esp - sizeof(int);
+		*esp = memcpy(*esp, &argc, sizeof(int));
+  		hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
+
+		//store a NULL pointer
+        	*esp = *esp - sizeof(void *);
+		*esp = memset(*esp, 0, sizeof(void *));
+  		hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
+      }      
       else
         palloc_free_page (kpage);
     }
