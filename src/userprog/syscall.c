@@ -16,5 +16,7 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   printf ("system call!\n");
+  printf("syscall type: %d\n", *(int*)f->esp);
+  printf("syscall SYS_WRITE = %d\n", SYS_WRITE);
   thread_exit ();
 }
