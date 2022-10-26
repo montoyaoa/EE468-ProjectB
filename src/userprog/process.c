@@ -233,7 +233,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
      as the filename of the program. */
   file = filesys_open (strtok_r(file_name, " " , &save_ptr));
 
-  //iterate through the rest of the arguments in the command input (useful for setup_stack())
+  //iterate through the rest of the arguments in the command input
+  //how many arguments there are (useful for setup_stack())
   for(token = strtok_r (NULL, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
   	num_args++;
 }
@@ -471,7 +472,6 @@ setup_stack (void **esp, const char *cmd_input, int num_args)
         		//store the current word on the stack
 			*esp = *esp - (strlen(token) + 1);
 			*esp = memcpy(*esp, token, strlen(token) + 1);
-  			hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
 			//store the memory location in the stack as the ith argv
 			argv[i] = *esp;
 			i++;
@@ -486,7 +486,6 @@ setup_stack (void **esp, const char *cmd_input, int num_args)
 			//align the stack pointer if necessary
 			*esp -= word_align;
 			memset(*esp, 0, word_align);
-  			hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
 		}      
 
 		//starting from the last argument pointer and iterating backwards
@@ -494,7 +493,6 @@ setup_stack (void **esp, const char *cmd_input, int num_args)
 			//store the stack location of each argument on the stack
         		*esp = *esp - sizeof(char *);
 			*esp = memcpy(*esp, &argv[i], sizeof(char *));
-  			hex_dump(*esp, *esp, PHYS_BASE - *esp, true);	
 		}
 
 		//store the location of the stack pointer after finishing the loop.
@@ -504,22 +502,20 @@ setup_stack (void **esp, const char *cmd_input, int num_args)
 		//store this temporary stack pointer location on the stack
 		*esp = *esp - sizeof(char **);
 		*esp = memcpy(*esp, &temp, sizeof(char **));
-  		hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
 
 		//store the number of arguments, argc.
         	*esp = *esp - sizeof(int);
 		*esp = memcpy(*esp, &argc, sizeof(int));
-  		hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
 
 		//store a NULL pointer
         	*esp = *esp - sizeof(void *);
 		*esp = memset(*esp, 0, sizeof(void *));
-  		hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
       }      
       else
         palloc_free_page (kpage);
     }
-  hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
+  //free() the malloc()ed array argv to prevent memory leaks
+  free(argv);
   return success;
 }
 
