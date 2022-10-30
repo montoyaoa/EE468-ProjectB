@@ -7,20 +7,24 @@
 #include "threads/synch.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "list.h"
+#include "threads/vaddr.h"
 
 static void syscall_handler (struct intr_frame *);
+void exitProcess(int status);
+void* addrCheck(const void *vaddr);
 
 struct lock file_lock;
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f UNUSED)
 {
   //printf ("system call!\n");
   //printf("syscall type: ");
@@ -39,11 +43,9 @@ syscall_handler (struct intr_frame *f UNUSED)
   //no return value
   case SYS_EXIT:
   {
-    int status = *((int*)f->esp + 4);
-
-    printf("SYS_EXIT\n");
-    hex_dump(f->esp, f->esp, 100, true);
-    fd = *((int*)f->esp + 1);
+    int * status = f->esp;
+    addrCheck(status+1);
+    exitProcess(*(status+1));
     break;
   }
   //1 argument: const char * cmd_line
@@ -91,7 +93,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     printf("SYS_FILESIZE\n");
     fd = *((int*)f->esp + 5);
     break;
-  //3 arguments: int filedescriptor, const void * buffer, 
+  //3 arguments: int filedescriptor, const void * buffer,
   case SYS_READ:
     printf("SYS_READ\n");
     break;
@@ -144,4 +146,33 @@ syscall_handler (struct intr_frame *f UNUSED)
     break;
   }
   thread_exit ();
+}
+
+void exitProcess(int status) {
+  struct list_elem *x;
+  for (x = list_begin(&thread_current()->parent->childProcess); x != list_end(&thread_current()->parent->childProcess); x = list_next(x)) {
+    struct child *y = list_entry(x, struct child, elem);
+    if (y->tid == thread_current()->tid) {
+      y->used = true;
+      y->exit_error = status;
+    }
+  }
+  thread_current()->exit_error = status;
+  if (thread_current()->parent->wait == thread_current()->tid) {
+    sema_up(&thread_current()->parent->childLock);
+  }
+  thread_exit();
+}
+
+void* addrCheck(const void *vaddr) {
+  if (is_user_vaddr(vaddr) == 0) {
+    exitProcess(-1);
+    return 0;
+  }
+  void *tmp = pagedir_get_page(thread_current()->pagedir, vaddr);
+  if (!tmp) {
+    exitProcess(-1);
+    return 0;
+  }
+  return tmp;
 }

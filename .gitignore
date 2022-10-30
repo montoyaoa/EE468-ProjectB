@@ -29,3 +29,4 @@ src/examples/lib/user/console.o
 src/examples/lib/user/debug.o
 src/examples/lib/user/entry.o
 src/examples/lib/user/syscall.o
+.idea
