@@ -22,8 +22,8 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
-  printf("syscall type: ");
+  //printf ("system call!\n");
+  //printf("syscall type: ");
   int fd;
 
   switch (*(int*)f->esp)
@@ -38,9 +38,14 @@ syscall_handler (struct intr_frame *f UNUSED)
   //1 argument: int status
   //no return value
   case SYS_EXIT:
+  {
+    int status = *((int*)f->esp + 4);
+
     printf("SYS_EXIT\n");
+    hex_dump(f->esp, f->esp, 100, true);
     fd = *((int*)f->esp + 1);
     break;
+  }
   //1 argument: const char * cmd_line
   //return pid_t of newly run executable
   case SYS_EXEC:
@@ -53,21 +58,23 @@ syscall_handler (struct intr_frame *f UNUSED)
     break;
   //2 arguments: const char * filename, unsigned initial_size
   //returns bool based on successful creation
-  case SYS_CREATE:
-    printf("SYS_CREATE\n");
-    //fd = *((int*)f->esp + 2);
-    //void* buffer = (void*) (*((int*)f->esp + 6));
-    //unsigned size = *((unsigned*)f->esp + 3);
-    //printf("fd=%d &fd=%x\n", fd, f->esp + 2);
-    //printf("buffer addr=%x\n", buffer);
-    //printf("size=%x &size=%x\n", size, f->esp + 12);
-    hex_dump(f->esp, f->esp, 100, true);
-    //printf("in switch statment: fd=%d size=%ld\n", fd, size);
-    //f->eax = write(fd, buffer, size);
+  case SYS_CREATE:{
+    //printf("SYS_CREATE\n");
+    const char * filename = (*((unsigned*)f->esp + 4));
+    unsigned initial_size = *((unsigned*)f->esp + 5);
+    //printf("memory location of filename pointer=%x\n", ((unsigned*)f->esp + 4));
+    //printf("value of that pointer=%x\n", *((unsigned*)f->esp+4));
+    //hex_dump(*((unsigned*)f->esp+4), *((unsigned*)f->esp+4), 100, true);
+    //printf("first character pointed to by that pointer=%c\n", (char *)(*((unsigned*)f->esp+4)));
+    //printf("filename=%s\n", filename);
+    //printf("initial_size=%ld\n", initial_size);
+    //hex_dump(f->esp, f->esp, 100, true);
+
     lock_acquire(&file_lock);
-    //f->eax = filesys_create(name,size);
+    f->eax = filesys_create(filename,initial_size);
     lock_release(&file_lock);
     break;
+  }
   //1 argument: const char * filename
   //returns bool based on successful deletion
   case SYS_REMOVE:
@@ -89,7 +96,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     printf("SYS_READ\n");
     break;
   case SYS_WRITE:
-    printf("SYS_WRITE\n");
+    //printf("SYS_WRITE\n");
     //extract out the useful information from the stack and pass it
     //to write()
     fd = *((int*)f->esp + 5);
@@ -108,6 +115,13 @@ syscall_handler (struct intr_frame *f UNUSED)
       putbuf(buffer, size);
       //return the number of bytes written
       f->eax = size;
+    }
+    else if(fd < 3){
+      f->eax = -1;
+    }
+    else{
+      //using the example at the top of list.h to iterate through the list
+      struct list_elem *e;
     }
     break;
   //2
