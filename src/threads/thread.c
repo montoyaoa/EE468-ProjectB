@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <random.h>
 #include <stdio.h>
-//@comment_this
+//stdlib.h not needed
 #include <stdlib.h>
 #include <string.h>
 #include "threads/flags.h"
@@ -39,7 +39,7 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
-//@comment_this
+//Add lock struct for threads
 struct lock filesys_lock;
 
 /* Stack frame for kernel_thread(). */
@@ -97,7 +97,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  //@comment_this
+  //Initialize the lock
   lock_init(&filesys_lock);
 
   /* Set up a thread structure for the running thread. */
@@ -191,7 +191,7 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  //@comment_this
+  //@Allocate a memory size and fill in the struct fields
   struct child* chd = malloc(sizeof(*chd));
   chd->tid = tid;
   chd->exit_error = t->exit_error;
@@ -312,7 +312,7 @@ thread_exit (void)
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
-  //@comment_this
+  //While list is not empty computes offset of the child process to the proc_file struct and subtracts bytes from the data_ptr. List_entry has form of list_entry(data_ptr, struct container, data_item) and provides pointer to the struct container that has the data, and then we free the struct when done
   while(!list_empty(&thread_current()->childProcess)){
       struct proc_file *f = list_entry (list_pop_front(&thread_current()->childProcess), struct child, elem);
       free(f);
@@ -490,7 +490,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  //@comment_this
+  //Initialize a thread list with a childProcess member
   list_init (&t->childProcess);
   t->parent = running_thread();
   list_init(&t->files);
@@ -598,7 +598,7 @@ schedule (void)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
 }
-//@comment_this
+//function to acquire a lock, not needed if using the lock_aquire and lock_release instead
 void acquire_filesys_lock()
 {
   lock_acquire(&filesys_lock);
