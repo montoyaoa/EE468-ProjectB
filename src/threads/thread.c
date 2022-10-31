@@ -38,6 +38,7 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+//@comment_this
 struct lock filesys_lock;
 
 /* Stack frame for kernel_thread(). */
@@ -95,6 +96,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  //@comment_this
   lock_init(&filesys_lock);
 
   /* Set up a thread structure for the running thread. */
@@ -188,12 +190,13 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  //@comment_this
   struct child* chd = malloc(sizeof(*chd));
   chd->tid = tid;
   chd->exit_error = t->exit_error;
   chd->used = false;
   list_push_back (&running_thread()->childProcess, &chd->elem);
-
+  //@to_here
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack'
@@ -308,11 +311,12 @@ thread_exit (void)
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
+  //@comment_this
   while(!list_empty(&thread_current()->childProcess)){
       struct proc_file *f = list_entry (list_pop_front(&thread_current()->childProcess), struct child, elem);
       free(f);
     }
-
+  //@to_here
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
@@ -485,6 +489,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  //@comment_this
   list_init (&t->childProcess);
   t->parent = running_thread();
   list_init(&t->files);
@@ -493,6 +498,7 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->childLock, 0);
   t->wait = 0;
   t->self = NULL;
+  //@to_here
   list_push_back (&all_list, &t->allelem);
 }
 
@@ -591,7 +597,7 @@ schedule (void)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
 }
-
+//@comment_this
 void acquire_filesys_lock()
 {
   lock_acquire(&filesys_lock);
@@ -601,7 +607,7 @@ void release_filesys_lock()
 {
   lock_release(&filesys_lock);
 }
-
+//@to_here
 /* Returns a tid to use for a new thread. */
 static tid_t
 allocate_tid (void)
