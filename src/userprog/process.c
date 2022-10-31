@@ -29,6 +29,7 @@ tid_t
 process_execute (const char *file_name)
 {
   char *fn_copy;
+  char *f_name;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -36,12 +37,25 @@ process_execute (const char *file_name)
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
+
   strlcpy (fn_copy, file_name, PGSIZE);
+  char *save_ptr;
+  f_name = malloc(strlen(file_name) + 1);
+  strlcpy(f_name, file_name, strlen(file_name) + 1);
+  f_name = strtok_r(f_name," ",&save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (f_name, PRI_DEFAULT, start_process, fn_copy);
+  free(f_name);
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
+
+  sema_down(&thread_current()->childLock);
+  if (!thread_current()->success) {
+    return -1;
+  }
+
   return tid;
 }
 
@@ -135,6 +149,16 @@ process_exit (void)
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
+  if (cur->exit_error==-100) {
+    exitProcess(-1);
+  }
+
+  int exitCode = cur->exit_error;
+  acquire_filesys_lock();
+  file_close(thread_current()->self);
+  closeAllFiles(&thread_current()->files);
+  release_filesys_lock();
+
   pd = cur->pagedir;
   if (pd != NULL)
     {
@@ -252,6 +276,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   int num_args = 0;
   char *token;
 
+  acquire_filesys_lock();
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL)
@@ -259,20 +284,24 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   //create a copy of the command input (in file_name)
-  char* cmd_input = palloc_get_page(0);
-  strlcat(cmd_input, file_name, strlen(file_name) + 1);
-  //a save pointer used for strtok_r (we don't use it, but it is required)
-  const char* save_ptr;
+  char* cmd_input = malloc(strlen(file_name)+1);
+  strlcpy(cmd_input, file_name, strlen(file_name) + 1);
 
+  //a save pointer used for strtok_r (we don't use it, but it is required)
+  char* save_ptr;
+  cmd_input = strtok_r(cmd_input," ", &save_ptr);
+
+  for(token = strtok_r (cmd_input, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
+    	num_args++;
+    }
   /* Open executable file. Use strtok_r to extract only the first word
      as the filename of the program. */
-  file = filesys_open (strtok_r(file_name, " " , &save_ptr));
+  file = filesys_open (cmd_input);
+  free(cmd_input);
 
   //iterate through the rest of the arguments in the command input
   //how many arguments there are (useful for setup_stack())
-  for(token = strtok_r (NULL, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
-  	num_args++;
-}
+
   if (file == NULL)
     {
       printf ("load: %s: open failed\n", file_name);
@@ -359,10 +388,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
+  thread_current()->self = file;
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  release_filesys_lock();
   return success;
 }
 
@@ -483,30 +513,34 @@ setup_stack (void **esp, const char *cmd_input, int num_args)
   bool success = false;
   char *token, *save_ptr;
   int argc, word_align;
-  char **argv;
+  int *argv;
   int i = 0;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-	if (success){
+	    if (success){
 		//initialize the stack pointer to PHYS_BASE.
 		//by default, it is zero.
-		*esp = PHYS_BASE;
+		    *esp = PHYS_BASE;
+		   } else {
+		      palloc_free_page(kpage);
+       }
+    }
 		//the total number of command inputs is the number of arguments,
 		//plus one for the filename of the program,
 		//plus one final terminating NULL.
-        	argc = num_args + 2;
+    argc = num_args + 2;
 		//initialize an array of pointers, each pointing to the location
 		//in the stack of each argument
-	 	argv = (char **)malloc(argc);
+	 	argv = calloc(argc, sizeof(int));
 
 		//iterate over the entire command input
 		for(token = strtok_r(cmd_input, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
         		//store the current word on the stack
 			*esp = *esp - (strlen(token) + 1);
-			*esp = memcpy(*esp, token, strlen(token) + 1);
+			memcpy(*esp, token, strlen(token) + 1);
 			//store the memory location in the stack as the ith argv
 			argv[i] = *esp;
 			i++;
@@ -516,18 +550,20 @@ setup_stack (void **esp, const char *cmd_input, int num_args)
 
 		//calculate the number of bytes needed to align the stack pointer
 		//by 4 bytes.
-		word_align = (size_t)*esp % 4;
-		if(word_align){
+		int zero = 0;
+		while((int)*esp % 4 != 0){
 			//align the stack pointer if necessary
-			*esp -= word_align;
-			memset(*esp, 0, word_align);
+			*esp -= sizeof(char);
+			char x = 0;
+			memcpy(*esp, &x, sizeof(char));
 		}
-
+    *esp -= sizeof(int);
+    memcpy(*esp, &zero, sizeof(int));
 		//starting from the last argument pointer and iterating backwards
-		for(i = num_args + 1; i >= 0; i--){
+		for(i = argc - 1; i >= 0; i--){
 			//store the stack location of each argument on the stack
-        		*esp = *esp - sizeof(char *);
-			*esp = memcpy(*esp, &argv[i], sizeof(char *));
+        		*esp = *esp - sizeof(int);
+			*esp = memcpy(*esp, &argv[i], sizeof(int));
 		}
 
 		//store the location of the stack pointer after finishing the loop.
@@ -535,20 +571,17 @@ setup_stack (void **esp, const char *cmd_input, int num_args)
 		void *temp = *esp;
 
 		//store this temporary stack pointer location on the stack
-		*esp = *esp - sizeof(char **);
-		*esp = memcpy(*esp, &temp, sizeof(char **));
+		*esp = *esp - sizeof(int);
+		*esp = memcpy(*esp, &temp, sizeof(int));
 
 		//store the number of arguments, argc.
-        	*esp = *esp - sizeof(int);
+    *esp = *esp - sizeof(int);
 		*esp = memcpy(*esp, &argc, sizeof(int));
 
 		//store a NULL pointer
-        	*esp = *esp - sizeof(void *);
-		*esp = memset(*esp, 0, sizeof(void *));
-      }
-      else
-        palloc_free_page (kpage);
-    }
+    *esp = *esp - sizeof(int);
+		*esp = memcpy(*esp, &zero, sizeof(void *));
+
   //free() the malloc()ed array argv to prevent memory leaks
   free(argv);
   return success;

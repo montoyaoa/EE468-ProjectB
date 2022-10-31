@@ -13,6 +13,13 @@
 static void syscall_handler (struct intr_frame *);
 void exitProcess(int status);
 void* addrCheck(const void *vaddr);
+void closeAllFiles(struct list* files);
+
+struct proc_file {
+	struct file* ptr;
+	int fd;
+	struct list_elem elem;
+};
 
 struct lock file_lock;
 
@@ -175,4 +182,15 @@ void* addrCheck(const void *vaddr) {
     return 0;
   }
   return tmp;
+}
+
+void closeAllFiles(struct list* files) {
+  struct list_elem *x;
+  while(!list_empty(files)) {
+    x = list_pop_front(files);
+    struct proc_file *f = list_entry(x, struct proc_file, elem);
+    file_close(f->ptr);
+    list_remove(x);
+    free(f);
+  }
 }
