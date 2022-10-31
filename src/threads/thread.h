@@ -4,9 +4,11 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+//@comment_this
 #include <stdlib.h>
 #include <kernel/list.h>
 #include <threads/synch.h>
+//@to_here
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -95,6 +97,7 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    //@comment_this
     struct list childProcess;
     struct semaphore childLock;
     int wait;
@@ -104,6 +107,7 @@ struct thread
     struct list files;
     struct file *self;
     bool success;
+    //@to_here
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -112,14 +116,14 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
-
+   //@comment_this
   struct child {
     int tid;
     struct list_elem elem;
     int exit_error;
     bool used;
   };
-
+   //@to_here
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
