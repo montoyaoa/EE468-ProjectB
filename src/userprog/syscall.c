@@ -37,12 +37,13 @@ syscall_handler (struct intr_frame *f UNUSED)
   //printf("syscall type: ");
   int fd;
 
-  switch (*(int*)f->esp)
+  int * p = f->esp;
+
+  switch (*p)
   {
   //no arguments
   //no return value
   case SYS_HALT:
-    printf("SYS_HALT\n");
     //the HALT syscall immediately shuts down the OS
     shutdown_power_off();
     break;
@@ -52,18 +53,16 @@ syscall_handler (struct intr_frame *f UNUSED)
   {
     int * status = f->esp;
     addrCheck(status+1);
-    exitProcess(*(status+1));
+    exitProcess(*(p+1));
     break;
   }
   //1 argument: const char * cmd_line
   //return pid_t of newly run executable
   case SYS_EXEC:
-    printf("SYS_EXEC\n");
     break;
   //1 argument: pid_t child_pid
   //return int child exit status
   case SYS_WAIT:
-    printf("SYS_WAIT\n");
     break;
   //2 arguments: const char * filename, unsigned initial_size
   //returns bool based on successful creation
@@ -87,72 +86,42 @@ syscall_handler (struct intr_frame *f UNUSED)
   //1 argument: const char * filename
   //returns bool based on successful deletion
   case SYS_REMOVE:
-    printf("SYS_REMOVE\n");
     break;
   //1 argument: const char * filename
   //returns int file descriptor
   case SYS_OPEN:
-    printf("SYS_OPEN\n");
     break;
   //1 argument: int filedescriptor
   //returns int size of file in bytes
   case SYS_FILESIZE:
-    printf("SYS_FILESIZE\n");
     fd = *((int*)f->esp + 5);
     break;
   //3 arguments: int filedescriptor, const void * buffer,
   case SYS_READ:
-    printf("SYS_READ\n");
     break;
   case SYS_WRITE:
-    //printf("SYS_WRITE\n");
-    //extract out the useful information from the stack and pass it
-    //to write()
-    fd = *((int*)f->esp + 5);
-    void* buffer = (void*) (*((int*)f->esp + 6));
-    unsigned size = *((unsigned*)f->esp + 7);
-    //printf("fd=%d &fd=%x\n", fd, f->esp + 2);
-    //printf("buffer addr=%x\n", buffer);
-    //printf("size=%x &size=%x\n", size, f->esp + 12);
-    //hex_dump(f->esp, f->esp, 100, true);
-    //printf("in switch statment: fd=%d size=%ld\n", fd, size);
-    //f->eax = write(fd, buffer, size);
-
-    //writing to console
-    if(fd == 1){
-      //use putbuf() to write to the console
-      putbuf(buffer, size);
-      //return the number of bytes written
-      f->eax = size;
-    }
-    else if(fd < 3){
-      f->eax = -1;
-    }
-    else{
-      //using the example at the top of list.h to iterate through the list
-      struct list_elem *e;
-    }
+    if(*(p+5)==1)
+		{
+			putbuf(*(p+6),*(p+7));
+			f->eax = *(p+7);
+		}
     break;
   //2
   case SYS_SEEK:
-    printf("SYS_SEEK\n");
     fd = *((int*)f->esp + 1);
     break;
   //1
   case SYS_TELL:
-    printf("SYS_TELL\n");
     fd = *((int*)f->esp + 1);
     break;
   //1
   case SYS_CLOSE:
-    printf("SYS_CLOSE\n");
     fd = *((int*)f->esp + 1);
     break;
   default:
     printf("ERROR\n");
     break;
   }
-  thread_exit ();
 }
 
 void exitProcess(int status) {
