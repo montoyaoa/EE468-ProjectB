@@ -14,6 +14,7 @@ static void syscall_handler (struct intr_frame *);
 void exitProcess(int status);
 void* addrCheck(const void *vaddr);
 void closeAllFiles(struct list* files);
+struct proc_file* list_search(struct list* files, int fd);
 
 struct proc_file {
 	struct file* ptr;
@@ -37,12 +38,13 @@ syscall_handler (struct intr_frame *f UNUSED)
   //printf("syscall type: ");
   int fd;
 
-  switch (*(int*)f->esp)
+  int * p = f->esp;
+
+  switch (*p)
   {
   //no arguments
   //no return value
   case SYS_HALT:
-    printf("SYS_HALT\n");
     //the HALT syscall immediately shuts down the OS
     shutdown_power_off();
     break;
@@ -50,21 +52,39 @@ syscall_handler (struct intr_frame *f UNUSED)
   //no return value
   case SYS_EXIT:
   {
+<<<<<<< HEAD
+    //int * status = f->esp;
+    addrCheck(p+1);
+=======
     int * status = f->esp;
     addrCheck(status+1);
-    exitProcess(*(status+1));
+>>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
+    exitProcess(*(p+1));
     break;
   }
   //1 argument: const char * cmd_line
   //return pid_t of newly run executable
   case SYS_EXEC:
-    printf("SYS_EXEC\n");
+<<<<<<< HEAD
+  {
+    addrCheck(p+1);
+    addrCheck(*(p+1));
+    f->eax = executeProcess(*(p+1));
+=======
+>>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
+  }
   //1 argument: pid_t child_pid
   //return int child exit status
   case SYS_WAIT:
-    printf("SYS_WAIT\n");
+<<<<<<< HEAD
+  {
+    addrCheck(p+1);
+    f->eax = process_wait(*(p+1));
+=======
+>>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
+  }
   //2 arguments: const char * filename, unsigned initial_size
   //returns bool based on successful creation
   case SYS_CREATE:{
@@ -87,72 +107,133 @@ syscall_handler (struct intr_frame *f UNUSED)
   //1 argument: const char * filename
   //returns bool based on successful deletion
   case SYS_REMOVE:
-    printf("SYS_REMOVE\n");
+<<<<<<< HEAD
+    addrCheck(p+1);
+    addrCheck(*(p+1));
+    lock_acquire(&file_lock);
+    if (filesys_remove(*(p+1)) == NULL) {
+      f->eax = false;
+    } else {
+      f->eax = true;
+    }
+    lock_release(&file_lock);
+=======
+>>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   //1 argument: const char * filename
   //returns int file descriptor
   case SYS_OPEN:
-    printf("SYS_OPEN\n");
+<<<<<<< HEAD
+    addrCheck(p+1);
+    addrCheck(*(p+1));
+    lock_acquire(&file_lock);
+    struct file* fptr = filesys_open (*(p+1));
+    lock_release(&file_lock);
+    if(fptr == NULL) {
+      f->eax = -1;
+    }
+    else {
+      struct proc_file *pfile = malloc(sizeof(*pfile));
+      pfile->ptr = fptr;
+      pfile->fd = thread_current()->fdCount;
+      thread_current()->fdCount++;
+      list_push_back(&thread_current()->files, &pfile->elem);
+      f->eax = pfile->fd;
+    }
+=======
+>>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   //1 argument: int filedescriptor
   //returns int size of file in bytes
   case SYS_FILESIZE:
-    printf("SYS_FILESIZE\n");
     fd = *((int*)f->esp + 5);
+    lock_acquire(&file_lock);
+    f->eax = file_length (list_search(&thread_current()->files, *(p+1))->ptr);
+    lock_release(&file_lock);
     break;
   //3 arguments: int filedescriptor, const void * buffer,
   case SYS_READ:
-    printf("SYS_READ\n");
+<<<<<<< HEAD
+    addrCheck(p+7);
+    addrCheck(*(p+6));
+    if (*(p+5) == 0) {
+      int i;
+      uint8_t* buffer = *(p+6);
+      for (i = 0; i < *(p+7); i++) {
+        buffer[i] = input_getc();
+      }
+      f->eax = *(p+7);
+    } else {
+      struct proc_file* fptr = list_search(&thread_current()->files, *(p+5));
+      if (fptr == NULL) {
+        f->eax = -1;
+      } else {
+        lock_acquire(&file_lock);
+        f->eax = file_read(fptr->ptr, *(p+6), *(p+7));
+        lock_release(&file_lock);
+      }
+    }
+=======
+>>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   case SYS_WRITE:
-    //printf("SYS_WRITE\n");
-    //extract out the useful information from the stack and pass it
-    //to write()
-    fd = *((int*)f->esp + 5);
-    void* buffer = (void*) (*((int*)f->esp + 6));
-    unsigned size = *((unsigned*)f->esp + 7);
-    //printf("fd=%d &fd=%x\n", fd, f->esp + 2);
-    //printf("buffer addr=%x\n", buffer);
-    //printf("size=%x &size=%x\n", size, f->esp + 12);
-    //hex_dump(f->esp, f->esp, 100, true);
-    //printf("in switch statment: fd=%d size=%ld\n", fd, size);
-    //f->eax = write(fd, buffer, size);
-
-    //writing to console
-    if(fd == 1){
-      //use putbuf() to write to the console
-      putbuf(buffer, size);
-      //return the number of bytes written
-      f->eax = size;
-    }
-    else if(fd < 3){
-      f->eax = -1;
-    }
-    else{
-      //using the example at the top of list.h to iterate through the list
-      struct list_elem *e;
-    }
+    if(*(p+5)==1)
+		{
+			putbuf(*(p+6),*(p+7));
+			f->eax = *(p+7);
+		}
+<<<<<<< HEAD
+    else
+		{
+			struct proc_file* fptr = list_search(&thread_current()->files, *(p+5));
+			if(fptr==NULL)
+				f->eax=-1;
+			else
+			{
+				lock_acquire(&file_lock);
+				f->eax = file_write (fptr->ptr, *(p+6), *(p+7));
+				lock_release(&file_lock);
+			}
+		}
+=======
+>>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   //2
   case SYS_SEEK:
-    printf("SYS_SEEK\n");
     fd = *((int*)f->esp + 1);
+    lock_acquire(&file_lock);
+    file_seek(list_search(&thread_current()->files, *(p+4))->ptr, *(p+5));
+    lock_release(&file_lock);
     break;
   //1
   case SYS_TELL:
-    printf("SYS_TELL\n");
+<<<<<<< HEAD
+    //fd = *((int*)f->esp + 1);
+    addrCheck(p+1);
+    lock_acquire(&file_lock);
+    f->eax = file_tell(list_search(&thread_current()->files, *(p+1))->ptr);
+    lock_release(&file_lock);
+    break;
+  //1
+  case SYS_CLOSE:
+    //fd = *((int*)f->esp + 1);
+    addrCheck(p+1);
+    lock_acquire(&file_lock);
+    close_file(&thread_current()->files, *(p+1));
+    lock_release(&file_lock);
+=======
     fd = *((int*)f->esp + 1);
     break;
   //1
   case SYS_CLOSE:
-    printf("SYS_CLOSE\n");
     fd = *((int*)f->esp + 1);
+>>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
+
   default:
     printf("ERROR\n");
     break;
   }
-  thread_exit ();
 }
 
 void exitProcess(int status) {
@@ -193,4 +274,55 @@ void closeAllFiles(struct list* files) {
     list_remove(x);
     free(f);
   }
+}
+
+struct proc_file* list_search(struct list* files, int fd)
+{
+
+	struct list_elem *e;
+
+      for (e = list_begin (files); e != list_end (files);
+           e = list_next (e))
+        {
+          struct proc_file *f = list_entry (e, struct proc_file, elem);
+          if(f->fd == fd)
+          	return f;
+        }
+   return NULL;
+}
+int executeProcess(char *file_name)
+{
+	lock_acquire(&file_lock);
+	char * fn = malloc (strlen(file_name)+1);
+	  strlcpy(fn, file_name, strlen(file_name)+1);
+
+	  char * save_ptr;
+	  fn = strtok_r(fn," ",&save_ptr);
+
+	 struct file* f = filesys_open (fn);
+
+	  if(f==NULL)
+	  {
+	  	lock_release(&file_lock);
+	  	return -1;
+	  }
+	  else
+	  {
+	  	file_close(f);
+	  	lock_release(&file_lock);
+	  	return process_execute(file_name);
+	  }
+}
+
+void close_file(struct list* files, int fd) {
+  struct list_elem *e;
+  struct proc_file *f;
+  for (e = list_begin(files); e != list_end(files); e = list_next(e)) {
+    f = list_entry(e, struct proc_file, elem);
+    if (f->fd == fd) {
+      file_close(f->ptr);
+      list_remove(e);
+    }
+  }
+  free(f);
 }
