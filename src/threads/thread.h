@@ -4,7 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-//@comment_this
+//Using functions from list.h/synch.h
 #include <stdlib.h>
 #include <kernel/list.h>
 #include <threads/synch.h>
@@ -97,15 +97,20 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    //@comment_this
+    //Created a child process struct
     struct list childProcess;
+    //Lock for child process
     struct semaphore childLock;
     int wait;
+    //Create parent thread
     struct thread* parent;
+    //Exit error for process wait initialized in thread.h to -100
     int exit_error;
+    //Doesnt seem to be used anywhere but is initialized to 2, I would leave it in for now but dont need to add to design doc
     int fdCount;
     struct list files;
     struct file *self;
+    //Used to keep track of success for if/else statements
     bool success;
     //@to_here
 #ifdef USERPROG
@@ -116,7 +121,7 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
-   //@comment_this
+   //adding a tid to the child, also want the child to contain a elem which points to both the next and previous elements, contains an exit error, and has a bool that just says if child is used or not
   struct child {
     int tid;
     struct list_elem elem;
