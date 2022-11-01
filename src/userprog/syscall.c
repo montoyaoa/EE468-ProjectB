@@ -52,37 +52,26 @@ syscall_handler (struct intr_frame *f UNUSED)
   //no return value
   case SYS_EXIT:
   {
-<<<<<<< HEAD
     //int * status = f->esp;
     addrCheck(p+1);
-=======
-    int * status = f->esp;
-    addrCheck(status+1);
->>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     exitProcess(*(p+1));
     break;
   }
   //1 argument: const char * cmd_line
   //return pid_t of newly run executable
   case SYS_EXEC:
-<<<<<<< HEAD
   {
     addrCheck(p+1);
     addrCheck(*(p+1));
     f->eax = executeProcess(*(p+1));
-=======
->>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   }
   //1 argument: pid_t child_pid
   //return int child exit status
   case SYS_WAIT:
-<<<<<<< HEAD
   {
     addrCheck(p+1);
     f->eax = process_wait(*(p+1));
-=======
->>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   }
   //2 arguments: const char * filename, unsigned initial_size
@@ -107,7 +96,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   //1 argument: const char * filename
   //returns bool based on successful deletion
   case SYS_REMOVE:
-<<<<<<< HEAD
     addrCheck(p+1);
     addrCheck(*(p+1));
     lock_acquire(&file_lock);
@@ -117,13 +105,10 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = true;
     }
     lock_release(&file_lock);
-=======
->>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   //1 argument: const char * filename
   //returns int file descriptor
   case SYS_OPEN:
-<<<<<<< HEAD
     addrCheck(p+1);
     addrCheck(*(p+1));
     lock_acquire(&file_lock);
@@ -140,8 +125,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       list_push_back(&thread_current()->files, &pfile->elem);
       f->eax = pfile->fd;
     }
-=======
->>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   //1 argument: int filedescriptor
   //returns int size of file in bytes
@@ -153,7 +136,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     break;
   //3 arguments: int filedescriptor, const void * buffer,
   case SYS_READ:
-<<<<<<< HEAD
     addrCheck(p+7);
     addrCheck(*(p+6));
     if (*(p+5) == 0) {
@@ -173,8 +155,6 @@ syscall_handler (struct intr_frame *f UNUSED)
         lock_release(&file_lock);
       }
     }
-=======
->>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   case SYS_WRITE:
     if(*(p+5)==1)
@@ -182,7 +162,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 			putbuf(*(p+6),*(p+7));
 			f->eax = *(p+7);
 		}
-<<<<<<< HEAD
     else
 		{
 			struct proc_file* fptr = list_search(&thread_current()->files, *(p+5));
@@ -195,8 +174,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 				lock_release(&file_lock);
 			}
 		}
-=======
->>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
   //2
   case SYS_SEEK:
@@ -207,7 +184,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     break;
   //1
   case SYS_TELL:
-<<<<<<< HEAD
     //fd = *((int*)f->esp + 1);
     addrCheck(p+1);
     lock_acquire(&file_lock);
@@ -221,13 +197,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     lock_acquire(&file_lock);
     close_file(&thread_current()->files, *(p+1));
     lock_release(&file_lock);
-=======
-    fd = *((int*)f->esp + 1);
-    break;
-  //1
-  case SYS_CLOSE:
-    fd = *((int*)f->esp + 1);
->>>>>>> 8b04ff7ff7774ea6b5249a033ac15e678fc3110a
     break;
 
   default:
