@@ -16,7 +16,8 @@ void* addrCheck(const void *vaddr);
 void closeAllFiles(struct list* files);
 struct proc_file* list_search(struct list* files, int fd);
 
-struct proc_file {
+struct proc_file 
+{
 	struct file* ptr;
 	int fd;
 	struct list_elem elem;
@@ -34,10 +35,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED)
 {
-  //printf ("system call!\n");
-  //printf("syscall type: ");
   int fd;
-
   int * p = f->esp;
 
   switch (*p)
@@ -52,7 +50,6 @@ syscall_handler (struct intr_frame *f UNUSED)
   //no return value
   case SYS_EXIT:
   {
-    //int * status = f->esp;
     addrCheck(p+1);
     exitProcess(*(p+1));
     break;
@@ -77,16 +74,8 @@ syscall_handler (struct intr_frame *f UNUSED)
   //2 arguments: const char * filename, unsigned initial_size
   //returns bool based on successful creation
   case SYS_CREATE:{
-    //printf("SYS_CREATE\n");
     const char * filename = (*((unsigned*)f->esp + 4));
     unsigned initial_size = *((unsigned*)f->esp + 5);
-    //printf("memory location of filename pointer=%x\n", ((unsigned*)f->esp + 4));
-    //printf("value of that pointer=%x\n", *((unsigned*)f->esp+4));
-    //hex_dump(*((unsigned*)f->esp+4), *((unsigned*)f->esp+4), 100, true);
-    //printf("first character pointed to by that pointer=%c\n", (char *)(*((unsigned*)f->esp+4)));
-    //printf("filename=%s\n", filename);
-    //printf("initial_size=%ld\n", initial_size);
-    //hex_dump(f->esp, f->esp, 100, true);
 
     lock_acquire(&file_lock);
     f->eax = filesys_create(filename,initial_size);
@@ -157,13 +146,11 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     break;
   case SYS_WRITE:
-    if(*(p+5)==1)
-		{
+    if(*(p+5)==1){
 			putbuf(*(p+6),*(p+7));
 			f->eax = *(p+7);
 		}
-    else
-		{
+    else{
 			struct proc_file* fptr = list_search(&thread_current()->files, *(p+5));
 			if(fptr==NULL)
 				f->eax=-1;
@@ -184,7 +171,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     break;
   //1
   case SYS_TELL:
-    //fd = *((int*)f->esp + 1);
     addrCheck(p+1);
     lock_acquire(&file_lock);
     f->eax = file_tell(list_search(&thread_current()->files, *(p+1))->ptr);
@@ -192,7 +178,6 @@ syscall_handler (struct intr_frame *f UNUSED)
     break;
   //1
   case SYS_CLOSE:
-    //fd = *((int*)f->esp + 1);
     addrCheck(p+1);
     lock_acquire(&file_lock);
     close_file(&thread_current()->files, *(p+1));
@@ -209,7 +194,7 @@ void exitProcess(int status) {
   struct list_elem *x;
   for (x = list_begin(&thread_current()->parent->childProcess); x != list_end(&thread_current()->parent->childProcess); x = list_next(x)) {
     struct child *y = list_entry(x, struct child, elem);
-    if (y->tid == thread_current()->tid) {
+    if (y->tid == thread_current()->tid){
       y->used = true;
       y->exit_error = status;
     }
@@ -236,7 +221,7 @@ void* addrCheck(const void *vaddr) {
 
 void closeAllFiles(struct list* files) {
   struct list_elem *x;
-  while(!list_empty(files)) {
+  while(!list_empty(files)){
     x = list_pop_front(files);
     struct proc_file *f = list_entry(x, struct proc_file, elem);
     file_close(f->ptr);
@@ -245,50 +230,42 @@ void closeAllFiles(struct list* files) {
   }
 }
 
-struct proc_file* list_search(struct list* files, int fd)
-{
-
+struct proc_file* list_search(struct list* files, int fd){
 	struct list_elem *e;
-
-      for (e = list_begin (files); e != list_end (files);
-           e = list_next (e))
-        {
-          struct proc_file *f = list_entry (e, struct proc_file, elem);
-          if(f->fd == fd)
-          	return f;
-        }
-   return NULL;
+  for (e = list_begin (files); e != list_end (files); e = list_next (e)){
+    struct proc_file *f = list_entry (e, struct proc_file, elem);
+    if(f->fd == fd)
+      return f;
+  }
+  return NULL;
 }
-int executeProcess(char *file_name)
-{
+int executeProcess(char *file_name){
 	lock_acquire(&file_lock);
 	char * fn = malloc (strlen(file_name)+1);
-	  strlcpy(fn, file_name, strlen(file_name)+1);
+	strlcpy(fn, file_name, strlen(file_name)+1);
 
-	  char * save_ptr;
-	  fn = strtok_r(fn," ",&save_ptr);
+	char * save_ptr;
+	fn = strtok_r(fn," ",&save_ptr);
 
-	 struct file* f = filesys_open (fn);
+	struct file* f = filesys_open (fn);
 
-	  if(f==NULL)
-	  {
-	  	lock_release(&file_lock);
-	  	return -1;
-	  }
-	  else
-	  {
-	  	file_close(f);
-	  	lock_release(&file_lock);
-	  	return process_execute(file_name);
-	  }
+	if(f==NULL){
+	  lock_release(&file_lock);
+	  return -1;
+	}
+	else{
+	  file_close(f);
+	  lock_release(&file_lock);
+	  return process_execute(file_name);
+	}
 }
 
 void close_file(struct list* files, int fd) {
   struct list_elem *e;
   struct proc_file *f;
-  for (e = list_begin(files); e != list_end(files); e = list_next(e)) {
+  for (e = list_begin(files); e != list_end(files); e = list_next(e)){
     f = list_entry(e, struct proc_file, elem);
-    if (f->fd == fd) {
+    if (f->fd == fd){
       file_close(f->ptr);
       list_remove(e);
     }
