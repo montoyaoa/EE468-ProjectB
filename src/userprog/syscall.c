@@ -77,6 +77,11 @@ syscall_handler (struct intr_frame *f UNUSED)
     const char * filename = (*((unsigned*)f->esp + 4));
     unsigned initial_size = *((unsigned*)f->esp + 5);
 
+    if(filename == NULL)
+    {
+      exitProcess(-1);
+    }
+
     lock_acquire(&file_lock);
     f->eax = filesys_create(filename,initial_size);
     lock_release(&file_lock);
