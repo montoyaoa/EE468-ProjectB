@@ -163,6 +163,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 				f->eax=-1;
 			else
 			{
+        addrCheck(*(p+6));
 				lock_acquire(&file_lock);
 				f->eax = file_write (fptr->ptr, *(p+6), *(p+7));
 				lock_release(&file_lock);
