@@ -256,7 +256,7 @@ struct Elf32_Phdr
 #define PF_R 4          /* Readable. */
 
 //added arguments to setup_stack: command input, and number of arguments
-static bool setup_stack (void **esp, char *cmd_input, int num_args);
+static bool setup_stack (void **esp, char *cmd_input);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -287,18 +287,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   char* first_arg = malloc(strlen(file_name)+1);
   //a save pointer used for strtok_r (we don't use it, but it is required)
   char* save_ptr;
-  //keep track of total arguments in the command input, other than the
-  //first one (which is the filename of the program to be run)
-  int num_args = 0;
   strlcpy(first_arg, file_name, strlen(file_name) + 1);
   //extract the first argument, then
   first_arg = strtok_r(first_arg," ", &save_ptr);
 
-  //iterate through the rest of the arguments
-  for(char * token = strtok_r (first_arg, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)){
-    //and count them
-    num_args++;
-  }
   /* Open executable file.*/
   file = filesys_open (first_arg);
   free(first_arg);
@@ -385,7 +377,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. Pass along the command input for parsing. */
-  if (!setup_stack (esp, file_name, num_args))
+  if (!setup_stack (esp, file_name))
     goto done;
 
   /* Start address. */
@@ -513,7 +505,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. Added argument: command input. */
 static bool
-setup_stack (void **esp, char *cmd_input, int num_args)
+setup_stack (void **esp, char *cmd_input)
 {
   uint8_t *kpage;
   bool success = false;
@@ -533,10 +525,27 @@ setup_stack (void **esp, char *cmd_input, int num_args)
 		  //the total number of command inputs is the number of arguments,
 		  //plus one for the filename of the program,
 		  //plus one final terminating NULL.
-      argc = num_args + 1;
-		  //initialize an array of pointers, each pointing to the location
-		  //in the stack of each argument
-	  	argv = (char **)malloc(argc);
+      argc = 0;
+      //make a temporary copy of the command input
+      char* temp_cpy = malloc(strlen(cmd_input)+1);
+      strlcpy(temp_cpy, cmd_input, strlen(cmd_input) + 1);
+      //iterate over the entire command input
+		  for(token = strtok_r(temp_cpy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
+        //count the total number of arguments
+			  argc++;
+		  }
+      //special case: no arguments other than the name of the program
+      if (argc == 1)
+      {
+        //store the name of the program, plus room for a NULL
+        argv = (char **)malloc(argc + 1);
+      }
+      else
+      {
+        //initialize an array of pointers, each pointing to the location
+		    //in the stack of each argument
+	  	  argv = (char **)malloc(argc);
+      }
 
 		  //iterate over the entire command input
 		  for(token = strtok_r(cmd_input, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
@@ -545,10 +554,10 @@ setup_stack (void **esp, char *cmd_input, int num_args)
 			  *esp = memcpy(*esp, token, strlen(token) + 1);
 			  //store the memory location in the stack as the ith argv
 			  argv[i] = *esp;
-			  i++;
+        i++;
 		  }
 		  //the last "argument" pointer should be a NULL pointer
-		  argv[num_args + 1] = 0;
+		  argv[argc] = 0;
 
 		  //calculate the number of bytes needed to align the stack pointer
 		  //by 4 bytes.
@@ -560,7 +569,7 @@ setup_stack (void **esp, char *cmd_input, int num_args)
 		  }
 
 		  //starting from the last argument pointer and iterating backwards
-		  for(i = num_args + 1; i >= 0; i--){
+		  for(i = argc + 1; i >= 0; i--){
 			  //store the stack location of each argument on the stack
         *esp = *esp - sizeof(char *);
 			  *esp = memcpy(*esp, &argv[i], sizeof(char *));
@@ -581,12 +590,13 @@ setup_stack (void **esp, char *cmd_input, int num_args)
 		  //store a NULL pointer
       *esp = *esp - sizeof(void *);
 		  *esp = memset(*esp, 0, sizeof(void *));
+      free(temp_cpy);
       }
       else
+      {
         palloc_free_page (kpage);
+      }
     }
-  //free() the malloc()ed array argv to prevent memory leaks
-  free(argv);
   return success;
 }
 
