@@ -37,6 +37,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   int fd;
   int * p = f->esp;
+  addrCheck(p);
 
   switch (*p)
   {
