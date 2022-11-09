@@ -41,22 +41,22 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   switch (*p)
   {
-  //no arguments
-  //no return value
+  // No arguments
+  // No return value
   case SYS_HALT:
-    //the HALT syscall immediately shuts down the OS
+    // The HALT syscall immediately shuts down the OS
     shutdown_power_off();
     break;
-  //1 argument: int status
-  //no return value
+  // 1 argument: int status
+  // No return value
   case SYS_EXIT:
   {
     addrCheck(p+1);
     exitProcess(*(p+1));
     break;
   }
-  //1 argument: const char * cmd_line
-  //return pid_t of newly run executable
+  // 1 argument: const char * cmd_line
+  // Return pid_t of newly run executable
   case SYS_EXEC:
   {
     addrCheck(p+1);
@@ -64,17 +64,18 @@ syscall_handler (struct intr_frame *f UNUSED)
     f->eax = executeProcess(*(p+1));
     break;
   }
-  //1 argument: pid_t child_pid
-  //return int child exit status
+  // 1 argument: pid_t child_pid
+  // Return int child exit status
   case SYS_WAIT:
   {
     addrCheck(p+1);
     f->eax = process_wait(*(p+1));
     break;
   }
-  //2 arguments: const char * filename, unsigned initial_size
-  //returns bool based on successful creation
-  case SYS_CREATE:{
+  // 2 arguments: const char * filename, unsigned initial_size
+  // Returns bool based on successful creation
+  case SYS_CREATE:
+  {
     const char * filename = (*((unsigned*)f->esp + 4));
     unsigned initial_size = *((unsigned*)f->esp + 5);
 
@@ -90,8 +91,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     lock_release(&file_lock);
     break;
   }
-  //1 argument: const char * filename
-  //returns bool based on successful deletion
+  // 1 argument: const char * filename
+  // Returns bool based on successful deletion
   case SYS_REMOVE:
     addrCheck(p+1);
     addrCheck(*(p+1));
@@ -103,8 +104,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     lock_release(&file_lock);
     break;
-  //1 argument: const char * filename
-  //returns int file descriptor
+  // 1 argument: const char * filename
+  // Returns int file descriptor
   case SYS_OPEN:
     addrCheck(p+1);
     addrCheck(*(p+1));
@@ -123,15 +124,15 @@ syscall_handler (struct intr_frame *f UNUSED)
       f->eax = pfile->fd;
     }
     break;
-  //1 argument: int filedescriptor
-  //returns int size of file in bytes
+  // 1 argument: int filedescriptor
+  // Returns int size of file in bytes
   case SYS_FILESIZE:
     fd = *((int*)f->esp + 5);
     lock_acquire(&file_lock);
     f->eax = file_length (list_search(&thread_current()->files, *(p+1))->ptr);
     lock_release(&file_lock);
     break;
-  //3 arguments: int filedescriptor, const void * buffer,
+  // 3 arguments: int filedescriptor, const void * buffer,
   case SYS_READ:
     addrCheck(p+7);
     addrCheck(*(p+6));
@@ -139,6 +140,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       int i;
       uint8_t* buffer = *(p+6);
       for (i = 0; i < *(p+7); i++) {
+      // Checks if the buffer is valid
         buffer[i] = input_getc();
       }
       f->eax = *(p+7);
@@ -153,6 +155,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       }
     }
     break;
+  // Writes given number of bytes to the file from the buffer
   case SYS_WRITE:
     if(*(p+5)==1){
 			putbuf(*(p+6),*(p+7));
@@ -166,29 +169,34 @@ syscall_handler (struct intr_frame *f UNUSED)
 			{
         addrCheck(*(p+6));
 				lock_acquire(&file_lock);
+				// Writes to files
 				f->eax = file_write (fptr->ptr, *(p+6), *(p+7));
 				lock_release(&file_lock);
 			}
 		}
     break;
-  //2
+  // 2
+  // Changes the next byte to be ready or written from the file to position
   case SYS_SEEK:
     fd = *((int*)f->esp + 1);
     lock_acquire(&file_lock);
     file_seek(list_search(&thread_current()->files, *(p+4))->ptr, *(p+5));
     lock_release(&file_lock);
     break;
-  //1
+  // 1
+  // Returns the position of the next byte to be read or written
   case SYS_TELL:
     addrCheck(p+1);
     lock_acquire(&file_lock);
     f->eax = file_tell(list_search(&thread_current()->files, *(p+1))->ptr);
     lock_release(&file_lock);
     break;
-  //1
+  // 1
+  // Closes a file with the given descriptor
   case SYS_CLOSE:
     addrCheck(p+1);
     lock_acquire(&file_lock);
+    //Close file in the system
     close_file(&thread_current()->files, *(p+1));
     lock_release(&file_lock);
     break;
