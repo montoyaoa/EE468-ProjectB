@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <kernel/list.h>
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -92,6 +93,20 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    //List of donor elements
+    struct list_elem donorelem;
+    //Tick count
+    int64_t waketick;
+    //Base priority for thread
+    int basepriority;
+    struct thread *locker;
+    //Potential Donor threads
+    struct list potentialDonors;
+    //Blocked threads
+    struct lock *blocked;
+    //Thread_nice functions
+    int nice;
+    int recent_cpu;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -106,6 +121,7 @@ struct thread
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
+int load_avg;
 
 void thread_init (void);
 void thread_start (void);
@@ -137,5 +153,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+bool compareWaketick(struct list_elem *first, struct list_elem *second, void *aux);
+bool comparePriority(struct list_elem *first, struct list_elem *second, void *aux);
 
 #endif /* threads/thread.h */
