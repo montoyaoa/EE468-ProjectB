@@ -516,24 +516,26 @@ setup_stack (void **esp, char *cmd_input)
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL)
+  {
+    success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+    if (success)
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-	    if (success){
-		  //initialize the stack pointer to PHYS_BASE.
-		  //by default, it is zero.
-		  *esp = PHYS_BASE;
-		  //the total number of command inputs is the number of arguments,
-		  //plus one for the filename of the program,
-		  //plus one final terminating NULL.
+      //initialize the stack pointer to PHYS_BASE.
+      //by default, it is zero.
+      *esp = PHYS_BASE;
+      //the total number of command inputs is the number of arguments,
+      //plus one for the filename of the program,
+      //plus one final terminating NULL.
       argc = 0;
       //make a temporary copy of the command input
       char* temp_cpy = malloc(strlen(cmd_input)+1);
       strlcpy(temp_cpy, cmd_input, strlen(cmd_input) + 1);
       //iterate over the entire command input
-		  for(token = strtok_r(temp_cpy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
+      for(token = strtok_r(temp_cpy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+      {
         //count the total number of arguments
-			  argc++;
-		  }
+        argc++;
+      }
       //special case: no arguments other than the name of the program
       if (argc == 1)
       {
@@ -543,60 +545,63 @@ setup_stack (void **esp, char *cmd_input)
       else
       {
         //initialize an array of pointers, each pointing to the location
-		    //in the stack of each argument
-	  	  argv = (char **)malloc(argc);
+        //in the stack of each argument
+        argv = (char **)malloc(argc);
       }
 
-		  //iterate over the entire command input
-		  for(token = strtok_r(cmd_input, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
-        //store the current word on the stack
-			  *esp = *esp - (strlen(token) + 1);
-			  *esp = memcpy(*esp, token, strlen(token) + 1);
-			  //store the memory location in the stack as the ith argv
-			  argv[i] = *esp;
-        i++;
-		  }
-		  //the last "argument" pointer should be a NULL pointer
-		  argv[argc] = 0;
-
-		  //calculate the number of bytes needed to align the stack pointer
-		  //by 4 bytes.
-		  word_align = (size_t)*esp % 4;
-		  if(word_align){
-			  //align the stack pointer if necessary
-			  *esp -= word_align;
-			  memset(*esp, 0, word_align);
-		  }
-
-		  //starting from the last argument pointer and iterating backwards
-		  for(i = argc + 1; i >= 0; i--){
-			  //store the stack location of each argument on the stack
-        *esp = *esp - sizeof(char *);
-			  *esp = memcpy(*esp, &argv[i], sizeof(char *));
-		  }
-
-		  //store the location of the stack pointer after finishing the loop.
-		  //this is the memory location of argv[0]
-		  void *temp = *esp;
-
-		  //store this temporary stack pointer location on the stack
-		  *esp = *esp - sizeof(char **);
-		  *esp = memcpy(*esp, &temp, sizeof(char **));
-
-		  //store the number of arguments, argc.
-      *esp = *esp - sizeof(int);
-		  *esp = memcpy(*esp, &argc, sizeof(int));
-
-		  //store a NULL pointer
-      *esp = *esp - sizeof(void *);
-		  *esp = memset(*esp, 0, sizeof(void *));
-      free(temp_cpy);
-      }
-      else
+      //iterate over the entire command input
+      for(token = strtok_r(cmd_input, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
       {
-        palloc_free_page (kpage);
+        //store the current word on the stack
+        *esp = *esp - (strlen(token) + 1);
+        *esp = memcpy(*esp, token, strlen(token) + 1);
+        //store the memory location in the stack as the ith argv
+        argv[i] = *esp;
+        i++;
       }
+      //the last "argument" pointer should be a NULL pointer
+      argv[argc] = 0;
+
+      //calculate the number of bytes needed to align the stack pointer
+      //by 4 bytes.
+      word_align = (size_t)*esp % 4;
+      if(word_align)
+      {
+        //align the stack pointer if necessary
+        *esp -= word_align;
+        memset(*esp, 0, word_align);
+      }
+
+      //starting from the last argument pointer and iterating backwards
+      for(i = argc + 1; i >= 0; i--)
+      {
+        //store the stack location of each argument on the stack
+        *esp = *esp - sizeof(char *);
+        *esp = memcpy(*esp, &argv[i], sizeof(char *));
+      }
+
+      //store the location of the stack pointer after finishing the loop.
+      //this is the memory location of argv[0]
+      void *temp = *esp;
+
+      //store this temporary stack pointer location on the stack
+      *esp = *esp - sizeof(char **);
+      *esp = memcpy(*esp, &temp, sizeof(char **));
+
+      //store the number of arguments, argc.
+      *esp = *esp - sizeof(int);
+      *esp = memcpy(*esp, &argc, sizeof(int));
+
+      //store a NULL pointer
+      *esp = *esp - sizeof(void *);
+      *esp = memset(*esp, 0, sizeof(void *));
+      free(temp_cpy);
     }
+    else
+    {
+      palloc_free_page (kpage);
+    }
+  }
   return success;
 }
 
